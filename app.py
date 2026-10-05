@@ -1,29 +1,30 @@
+
 import altair as alt
 import pandas as pd
 import streamlit as st
-
+ 
 from propcompare.data import FURNISHING, LOCATIONS, PROPERTY_TYPES, clean, generate_dataset
 from propcompare.model import predict, train_all
 from propcompare.utils import fmt, per_sqft
-
+ 
 st.set_page_config(page_title="PropCompare — Mumbai Property Intelligence", page_icon="🏙️", layout="wide")
-
+ 
 # Replace these with licensed/local assets before public deployment.
 HERO_IMAGE = "https://propertycloud.in/assets/images/gallery/1744279394.webp"
 INTERIOR_IMAGE = "https://assets.architecturaldigest.in/photos/60083a17a87939f78414ee78/4%3A3/w_1600,h_1200,c_limit/asa-apartment-mumbai-featured-image-1366x768.jpg"
-
+ 
 @st.cache_data(show_spinner=False)
 def load_data():
     return clean(generate_dataset())
-
+ 
 @st.cache_resource(show_spinner="Training valuation models…")
 def load_models():
     return train_all(load_data())
-
+ 
 df = load_data()
 models = load_models()
 LOCS = sorted(LOCATIONS)
-
+ 
 st.markdown(f"""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap');
@@ -57,21 +58,26 @@ body,[class*="css"] {{font-family:"DM Sans",sans-serif}}
 .badge {{display:inline-block;padding:5px 10px;border-radius:999px;color:#1d4ed8;background:#eff6ff}}
 div[data-baseweb="select"]>div,div[data-testid="stNumberInput"]>div {{border-radius:12px!important;border-color:rgba(15,23,42,.1)!important;background:rgba(255,255,255,.8)!important}}
 button[data-baseweb="tab"] {{font-weight:700!important}}button[data-baseweb="tab"][aria-selected="true"] {{color:#2563eb!important}}
+/* New button styles for minimal skeuomorphism and smooth 3D effects */
+.stButton>button {{background:linear-gradient(145deg,#f0f0f3,#cacaca);border-radius:12px;border:1px solid #b8b8b8;box-shadow:5px 5px 10px #a3a3a3,-5px -5px 10px #ffffff;color:#111827;font-weight:600;padding:.5rem 1.2rem;cursor:pointer;transition:all .3s ease;font-family:"DM Sans",sans-serif;outline-offset:4px}}
+.stButton>button:hover {{background:linear-gradient(145deg,#e2e2e5,#d1d1d5);box-shadow:8px 8px 15px #9a9a9a,-8px -8px 15px #ffffff;color:#2563eb;transform:translateY(-3px)}}
+.stButton>button:focus-visible {{outline:3px solid #2563eb;outline-offset:3px}}
+.stButton>button:active {{box-shadow:inset 3px 3px 6px #a3a3a3,inset -3px -3px 6px #ffffff;transform:translateY(1px)}}
 @keyframes heroIn {{from{{opacity:0;transform:translateY(12px) scale(.985)}}to{{opacity:1;transform:none}}}}
 @media(max-width:850px){{.hero-content{{padding:32px 25px}}.bento{{grid-template-columns:1fr 1fr;grid-template-rows:210px 130px 130px}}.bento-main{{grid-column:1/3;grid-row:1/2}}}}
 @media(max-width:560px){{.bento{{display:block}}.card{{margin-bottom:10px;min-height:125px}}}}
 #MainMenu,footer{{visibility:hidden}}header[data-testid="stHeader"]{{background:transparent}}
 </style>
 """, unsafe_allow_html=True)
-
+ 
 def kpi(label, value, sub=""):
     return f'<div class="kpi"><div class="kpi-label">{label}</div><div class="kpi-value">{value}</div><div class="kpi-sub">{sub}</div></div>'
-
+ 
 def profile_score(p):
     score=50+min(p["parking"]*6,12)+min(p["lift"]*5,5)+min(p["gym"]*5,5)+min(p["pool"]*4,4)+min(p["security"]*5,5)
     score+=max(0,10-p["metro_dist_km"]*4)+max(0,5-p["school_dist_km"])-min(p["age_years"]*.25,8)
     return max(0,min(100,round(score)))
-
+ 
 def property_form(key, d):
     st.markdown('<div class="section"><div class="section-title">Property details</div><div class="section-sub">Attributes sent to the valuation model.</div></div>', unsafe_allow_html=True)
     c1,c2=st.columns(2)
@@ -94,15 +100,15 @@ def property_form(key, d):
     a1,a2,a3,a4=st.columns(4)
     lift=int(a1.checkbox("Lift",d["lift"],key=f"{key}_lift")); gym=int(a2.checkbox("Gym",d["gym"],key=f"{key}_gym")); pool=int(a3.checkbox("Pool",d["pool"],key=f"{key}_pool")); sec=int(a4.checkbox("24×7 security",d["security"],key=f"{key}_sec"))
     return dict(location=loc,city=LOCATIONS[loc][0],property_type=ptype,bhk=int(bhk),bathrooms=int(bath),area_sqft=float(area),floor=int(floor),total_floors=int(total),age_years=float(age),furnishing=furn,parking=int(parking),lift=lift,gym=gym,pool=pool,security=sec,metro_dist_km=float(metro),school_dist_km=float(school))
-
+ 
 A_DEF=dict(location="Andheri West",property_type="Apartment",bhk=2,bathrooms=2,area_sqft=850,floor=8,total_floors=20,age_years=4.,furn_idx=1,parking=1,metro_dist_km=.8,school_dist_km=1.,lift=True,gym=True,pool=False,security=True)
 B_DEF=dict(A_DEF,location="Kharghar",area_sqft=950,floor=10,total_floors=22,age_years=2.,metro_dist_km=1.5,pool=True)
-
+ 
 st.markdown('''<div class="hero"><div class="hero-content"><div class="kicker">Mumbai Metropolitan Region · Property intelligence</div><div class="hero-title">Know what a property<br>is worth before you decide.</div><div class="hero-copy">Compare homes across Mumbai and Navi Mumbai using an explainable machine-learning valuation workflow. Explore the estimate, uncertainty, market context and the features driving the result.</div><div class="pills"><span class="pill">AI valuation</span><span class="pill">Property comparison</span><span class="pill">₹ / sq ft analysis</span><span class="pill">Market explorer</span></div></div></div>''',unsafe_allow_html=True)
-
+ 
 listing=st.radio("Market mode",["Sale","Rent"],horizontal=True,label_visibility="collapsed")
 tab_pred,tab_cmp,tab_mkt,tab_model=st.tabs(["💰 Estimate","⚖️ Compare","📊 Market","🧠 Model"])
-
+ 
 with tab_pred:
     st.markdown('<div class="section"><div class="section-title">Start with one property</div><div class="section-sub">Build a property profile, then inspect the estimate and market context.</div></div>',unsafe_allow_html=True)
     left,right=st.columns([1.25,.95],gap="large")
@@ -116,7 +122,7 @@ with tab_pred:
         st.info("The valuation is an ML estimate, not an official property valuation. The current application uses simulated data.")
         c1,c2,c3,c4=st.columns(4)
         c1.markdown(kpi("Metro",f'{prop["metro_dist_km"]:.1f} km'),unsafe_allow_html=True); c2.markdown(kpi("Parking",str(prop["parking"]),"Spots"),unsafe_allow_html=True); c3.markdown(kpi("Security","Yes" if prop["security"] else "No","24×7 input"),unsafe_allow_html=True); c4.markdown(kpi("Age",f'{prop["age_years"]:.1f} yrs'),unsafe_allow_html=True)
-
+ 
 with tab_cmp:
     st.markdown('<div class="section"><div class="section-title">Which property wins?</div><div class="section-sub">Compare predicted value, efficiency and property profile — not only the headline price.</div></div>',unsafe_allow_html=True)
     ca,cb=st.columns(2,gap="large")
@@ -131,7 +137,7 @@ with tab_cmp:
     chart_df=pd.DataFrame({"Property":["A","B"],"₹ per sq ft":[pps_a,pps_b]})
     st.altair_chart(alt.Chart(chart_df).mark_bar(cornerRadiusTopLeft=8,cornerRadiusTopRight=8).encode(x=alt.X("Property:N",axis=alt.Axis(labelAngle=0)),y=alt.Y("₹ per sq ft:Q",title="Estimated ₹ / sq ft"),tooltip=["Property","₹ per sq ft"]).properties(height=300,title="Price efficiency"),width="stretch")
     st.success(f"Property {value_leader} leads on estimated ₹/sq ft; Property {profile_leader} has the stronger profile score.") if value_leader==profile_leader else st.info(f"Property {value_leader} is cheaper per sq ft, while Property {profile_leader} has the stronger profile score.")
-
+ 
 with tab_mkt:
     st.markdown('<div class="section"><div class="section-title">Understand the market around the property</div><div class="section-sub">Explore simulated micro-market distributions instead of looking at one prediction in isolation.</div></div>',unsafe_allow_html=True)
     sub=df[df.listing_type==listing].copy(); by_loc=sub.groupby(["location","city"],as_index=False)["price"].median().sort_values("price",ascending=False); by_loc["label"]=[fmt(listing,v) for v in by_loc["price"]]
@@ -143,7 +149,7 @@ with tab_mkt:
     with c2:
         st.markdown('<div class="section"><div class="section-title">Price distribution</div><div class="section-sub">See how the sample spreads by BHK.</div></div>',unsafe_allow_html=True)
         st.altair_chart(alt.Chart(sub).mark_boxplot(size=55).encode(x=alt.X("bhk:O",title="BHK"),y=alt.Y("price:Q",title="Price")).properties(height=410),width="stretch")
-
+ 
 with tab_model:
     st.markdown('<div class="section"><div class="section-title">Inside the valuation engine</div><div class="section-sub">A polished product should also explain its model and limitations.</div></div>',unsafe_allow_html=True)
     st.warning("The current project trains on a generated/simulated dataset. These metrics measure model behaviour on that dataset; they are not evidence of real-world Mumbai valuation accuracy.")
@@ -153,5 +159,5 @@ with tab_model:
         imp=b.importances.head(10).reset_index(); imp.columns=["feature","importance"]
         st.altair_chart(alt.Chart(imp).mark_bar(cornerRadiusEnd=5).encode(y=alt.Y("feature:N",sort="-x",title=None),x=alt.X("importance:Q",title="Importance"),tooltip=["feature","importance"]).properties(height=300,title=f"Top features — {lt}"),width="stretch")
     with st.expander("Preview generated dataset"): st.dataframe(df.head(100),width="stretch")
-
+ 
 st.markdown('<hr style="border:0;border-top:1px solid rgba(15,23,42,.08);margin-top:55px"><div style="text-align:center;color:#64748b;font-size:.78rem;line-height:1.7;padding:18px"> <strong>PropCompare</strong> · Mumbai & Navi Mumbai Property Intelligence<br>Current valuation engine uses simulated project data. Estimates are indicative, not official valuations.<br>Replace remote imagery with licensed/local assets before public deployment.</div>',unsafe_allow_html=True)
