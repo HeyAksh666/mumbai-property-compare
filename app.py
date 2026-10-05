@@ -425,17 +425,8 @@ def load_models():
     return train_all(load_data())
 
 
-try:
-    df = load_data()
-    models = load_models()
-except Exception as exc:  # noqa: BLE001 — show a readable message instead of a traceback
-    st.error(
-        "We couldn't load the pricing data or models. Check that the `propcompare` "
-        "package is installed, then refresh the page."
-    )
-    with st.expander("Technical details"):
-        st.exception(exc)
-    st.stop()
+df = None
+models = None
 
 LOCS = sorted(LOCATIONS)
 
@@ -1132,6 +1123,32 @@ def model_view() -> None:
         )
 
 
+
+
+# ============================================================
+# LOAD DATA & MODELS (after the page shell is on screen, so users see
+# the header and hero straight away instead of a blank spinner)
+# ============================================================
+def _log(msg: str) -> None:
+    print(f"[propcompare] {msg}", flush=True)  # shows up in the Streamlit Cloud logs
+
+
+try:
+    _log("loading data…")
+    with st.spinner("Preparing the demo data and pricing models. The first visit can take a minute."):
+        df = load_data()
+        _log("data ready, training models…")
+        models = load_models()
+    _log("models ready")
+except Exception as exc:  # noqa: BLE001 — show a readable message instead of a blank page
+    _log(f"FAILED: {exc!r}")
+    st.error(
+        "We couldn't load the pricing data or models. Check that the `propcompare` "
+        "package is installed, then refresh the page."
+    )
+    with st.expander("Technical details"):
+        st.exception(exc)
+    st.stop()
 
 
 # ============================================================
