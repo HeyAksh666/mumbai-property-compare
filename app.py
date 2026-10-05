@@ -189,7 +189,7 @@ div[role="radiogroup"] label:has(input:checked) p { font-weight: 700; }
 .scene {
     position: absolute; left: 50%; top: 60%; width: 192px; height: 192px; margin: -96px 0 0 -96px;
     transform-style: preserve-3d; transform: rotateX(58deg) rotateZ(42deg);
-    animation: sway 16s ease-in-out infinite alternate; will-change: transform;
+    animation: sway 16s ease-in-out 2 alternate;
 }
 @keyframes sway {
     from { transform: rotateX(58deg) rotateZ(38deg); }
@@ -250,7 +250,7 @@ div[role="radiogroup"] label:has(input:checked) p { font-weight: 700; }
     padding: 1rem 1.1rem;
     border: 1px solid var(--line);
     border-radius: 20px;
-    background: var(--grain), linear-gradient(180deg, #ffffff, #f6f9f8);
+    background: linear-gradient(180deg, #ffffff, #f6f9f8);
     box-shadow: var(--raise);
 }
 .tile .k { color: var(--muted); font-size: .88rem; font-weight: 500; }
@@ -262,12 +262,12 @@ div[role="radiogroup"] label:has(input:checked) p { font-weight: 700; }
 }
 .tile .v.sm { font-size: 1.05rem; }
 .tile .s { color: var(--muted); font-size: .88rem; margin-top: .2rem; }
-.tile.good { background: var(--grain), linear-gradient(180deg, #f4fbfa, #e8f4f2); border-color: #a9cfcb; }
+.tile.good { background: linear-gradient(180deg, #f4fbfa, #e8f4f2); border-color: #a9cfcb; }
 
 /* Ink tile: the estimate, like a dark inlaid plate */
 .tile-ink {
     border: 1px solid #0b2a30;
-    background: var(--grain), linear-gradient(165deg, #17595f, var(--sea-deep));
+    background: linear-gradient(165deg, #17595f, var(--sea-deep));
     color: #f2f8f7;
     box-shadow: inset 0 1px 0 rgba(255,255,255,.18), inset 0 -2px 6px rgba(0,0,0,.25),
                 0 14px 22px -18px rgba(14,50,56,.8);
@@ -305,8 +305,7 @@ div[role="radiogroup"] label:has(input:checked) p { font-weight: 700; }
     position: absolute; left: .7rem; right: .7rem; bottom: .7rem;
     display: flex; flex-direction: column; gap: .05rem;
     padding: .6rem .85rem; border-radius: 14px; font-size: .85rem; color: var(--ink);
-    background: rgba(255,255,255,.78);
-    -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+    background: rgba(255,255,255,.9);
     border: 1px solid rgba(255,255,255,.7);
     box-shadow: inset 0 1px 0 #fff, 0 6px 12px -10px rgba(18,38,43,.5);
 }
@@ -339,19 +338,6 @@ div[role="radiogroup"] label:has(input:checked) p { font-weight: 700; }
 /* 3D tilt (hover only) */
 .tilt3d { transition: transform .45s var(--ease); transform: perspective(1000px); }
 .tilt3d:hover { transform: perspective(1000px) rotateX(2deg) rotateY(-3deg) translateY(-3px); }
-
-/* Scroll-driven reveal (progressive enhancement, uses `translate` so hover tilt still works) */
-@keyframes reveal {
-    from { opacity: 0; translate: 0 18px; scale: .985; }
-    to   { opacity: 1; translate: 0 0; scale: 1; }
-}
-@supports (animation-timeline: view()) {
-    .bento > .tile {
-        animation: reveal linear both;
-        animation-timeline: view();
-        animation-range: entry 0% entry 40%;
-    }
-}
 
 .jump { display: none; }
 
@@ -703,6 +689,14 @@ def show_chart(chart) -> None:
 # PROPERTY FORM
 # ============================================================
 def property_form(key: str, defaults: dict, *, presets: bool = False) -> dict:
+    saved = st.session_state.get(f"_saved_{key}")
+    if saved:  # restore values after the user switched sections and back
+        defaults = {
+            **defaults, **saved,
+            "furn_idx": FURNISHING.index(saved["furnishing"]) if saved["furnishing"] in FURNISHING else defaults["furn_idx"],
+            "lift": bool(saved["lift"]), "gym": bool(saved["gym"]),
+            "pool": bool(saved["pool"]), "security": bool(saved["security"]),
+        }
     if presets:
         st.caption("Start from an example, then adjust anything you like.")
         cols = st.columns(len(PRESETS))
@@ -760,12 +754,14 @@ def property_form(key: str, defaults: dict, *, presets: bool = False) -> dict:
     pool = int(a3.checkbox("Pool", defaults["pool"], key=f"{key}_pool"))
     sec = int(a4.checkbox("24×7 security", defaults["security"], key=f"{key}_sec"))
 
-    return dict(
+    prop = dict(
         location=loc, city=LOCATIONS[loc][0], property_type=ptype, bhk=int(bhk), bathrooms=int(bath),
         area_sqft=float(area), floor=int(floor), total_floors=int(total), age_years=float(age),
         furnishing=furn, parking=int(parking), lift=lift, gym=gym, pool=pool, security=sec,
         metro_dist_km=float(metro), school_dist_km=float(school),
     )
+    st.session_state[f"_saved_{key}"] = prop
+    return prop
 
 
 # ============================================================
@@ -823,9 +819,10 @@ html(f"""
 
 st.write("")
 
-tab_est, tab_cmp, tab_mkt, tab_model = st.tabs(
-    ["Estimate", "Compare two homes", "Neighbourhoods", "How it works"]
-)
+SECTIONS = ["Estimate", "Compare two homes", "Neighbourhoods", "How it works"]
+section = st.segmented_control(
+    "Section", SECTIONS, default=SECTIONS[0], key="section", label_visibility="collapsed",
+) or SECTIONS[0]
 
 
 # ============================================================
@@ -895,8 +892,6 @@ def estimate_view(listing: str) -> None:
         )
 
 
-with tab_est:
-    estimate_view(listing)
 
 
 # ============================================================
@@ -996,8 +991,6 @@ def compare_view(listing: str) -> None:
     show_chart((bars + labels).properties(height=300))
 
 
-with tab_cmp:
-    compare_view(listing)
 
 
 # ============================================================
@@ -1090,8 +1083,6 @@ def market_view(listing: str) -> None:
         show_chart(box)
 
 
-with tab_mkt:
-    market_view(listing)
 
 
 # ============================================================
@@ -1141,7 +1132,18 @@ def model_view() -> None:
         )
 
 
-with tab_model:
+
+
+# ============================================================
+# SHOW ONLY THE ACTIVE SECTION (the other three cost nothing)
+# ============================================================
+if section == SECTIONS[0]:
+    estimate_view(listing)
+elif section == SECTIONS[1]:
+    compare_view(listing)
+elif section == SECTIONS[2]:
+    market_view(listing)
+else:
     model_view()
 
 
